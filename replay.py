@@ -14,7 +14,7 @@ if __name__ == '__main__':
         obs = Observable()
         obs.updateObserversWithImage('output', output.data, 'tensorPIL')
 
-    convolutions.decoder.register_forward_hook(send_output)
+    convolutions.decoder.register_forward_hook(Observable.send_output_as_image)
 
     dispatcher.registerView('output', OpenCV('output', (420, 320)))
 

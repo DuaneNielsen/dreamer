@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.utils.rnn as rnn_utils
 from mentalitystorm import Storeable, BaseVAE
 
 
@@ -18,12 +19,15 @@ class MDNRNN(nn.Module):
         self.sigma = nn.Linear(hidden_size, z_size * n_gaussians)
 
     """Computes MDN parameters a mix of gassians at each timestep
-    z - (batch size, episode length, latent size)
+    z - a list, len(batch_size), of [episode length, latent size]
     pi, mu, sigma - (batch size, episode length, n_gaussians)
     """
     def forward(self, z):
-        episode_length = z.size(1)
-        output, (hn, cn) = self.lstm(z)
+        packed = rnn_utils.pack_sequence(z)
+        packed_output, (hn, cn) = self.lstm(packed)
+        output, index = rnn_utils.pad_packed_sequence(packed_output)
+
+        episode_length = output.size(0)
 
         pi = self.pi(output)
         mu = self.mu(output)
@@ -57,7 +61,7 @@ class MDNRNN(nn.Module):
     sigma - vector of standard deviation of distribution
     """
     def loss_fn(self, y, pi, mu, sigma):
-        y = y.unsqueeze(2)
+        y = y.unsqueeze(3)
         mixture = torch.distributions.normal.Normal(mu, sigma)
         log_prob = mixture.log_prob(y)
         weighted_logprob = log_prob + pi
