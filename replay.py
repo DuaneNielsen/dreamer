@@ -22,11 +22,8 @@ if __name__ == '__main__':
     dispatcher.registerView('delta', OpenCV('delta', (420, 320)))
 
     for raw_latent, first_frame, delta_latent, action_minibatch in loader:
-        #assert raw_latent[0][0, 0, 0] - first_frame[0][0, 0, 0] == delta_latent[0][0, 0, 0]
 
         ds = data.DeltaStream(first_frame[0])
-        #zero_delta = torch.zeros(first_frame[0].shape)
-        #assert ds.delta_to_frame(zero_delta).sum() == first_frame[0].sum()
 
         for i, delta in enumerate(delta_latent[0]):
 
@@ -34,24 +31,3 @@ if __name__ == '__main__':
             original = raw_latent[0][i, :, :]
             d1.decoder(original.unsqueeze(0))
             d2.decoder(from_delta.unsqueeze(0))
-
-
-
-
-            # first_frame = None
-            # running_delta = torch.zeros(1, item.shape[1], 1, 1)
-            # prev_frame = None
-            # for i, frame in enumerate(item):
-            #     if i <= 0:
-            #         first_frame = frame.unsqueeze(0)
-            #         prev_frame = frame.unsqueeze(0)
-            #         convolutions.decoder(frame.unsqueeze(0))
-            #     else:
-            #         delta = frame - prev_frame
-            #         running_delta = running_delta + delta
-            #         theframe = first_frame + running_delta
-            #         decoder2.decoder(theframe)
-            #         convolutions.decoder(frame.unsqueeze(0))
-            #         prev_frame = frame
-
-

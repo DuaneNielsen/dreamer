@@ -65,11 +65,13 @@ if __name__ == '__main__':
 
     for epoch in range(100):
         loss = None
-        for first_frame, observation_minibatch, action_minibatch in train:
+        for raw_latent, first_frame, delta_latent, action_minibatch in train:
+
             #seq_length = max_seq_length(observation_minibatch)
             #tl = timeline(batch_size, seq_length, z_size, device)
+
             pi, mu, sigma, _ = model(action_minibatch, device)
-            padded_obs = rnn_utils.pad_sequence(observation_minibatch, batch_first=True).squeeze().to(device)
+            padded_obs = rnn_utils.pad_sequence(delta_latent, batch_first=True).squeeze().to(device)
             padded_obs = padded_obs.clamp(1e-1, 1e1)
             loss = model.loss_fn(padded_obs, pi, mu, sigma)
             optimizer.zero_grad()
@@ -80,22 +82,24 @@ if __name__ == '__main__':
             global_step += 1
 
         if epoch % 1 == 0:
-            for first_frame, observation_minibatch, action_minibatch in test:
+            for raw_latent, first_frame, delta_latent, action_minibatch in test:
                 #tl = timeline(1, 20, z_size, device)
                 pi, mu, sigma, _ = model(action_minibatch, device)
+                padded_obs = rnn_utils.pad_sequence(delta_latent, batch_first=True).squeeze().to(device)
                 loss = model.loss_fn(padded_obs, pi, mu, sigma)
                 print('Loss: ' + str(loss.item()))
                 tb.add_scalar('test/loss', loss.item(), global_step)
                 tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
                 y_pred = model.sample(pi, mu, sigma)
                 y_pred = y_pred[0].squeeze()
-                observation_seq = observation_minibatch[0].to(device)
                 global_step += 1
-                for i in range(100):
-                    theframe = y_pred[i].unsqueeze(0).unsqueeze(2).unsqueeze(3)
-                    convolutions.decoder(theframe)
-                    ground_truth_decoder.decoder(observation_seq[i].unsqueeze(0))
-                    import time
-                    time.sleep(1/26)
+
+                ds = data.DeltaStream(first_frame[0])
+
+                for i, delta in enumerate(delta_latent[0]):
+                    from_delta = ds.delta_to_frame(delta_latent[0][i, :, :]).to(device)
+                    original = raw_latent[0][i, :, :].to(device)
+                    convolutions.decoder(from_delta.unsqueeze(0))
+                    ground_truth_decoder.decoder(original.unsqueeze(0))
             model.save(config.model_fn(model))
 
