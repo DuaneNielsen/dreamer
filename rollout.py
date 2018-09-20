@@ -55,5 +55,5 @@ if __name__ == '__main__':
     rollout.registerView('screen_action', ae)
 
 
-    for i_episode in range(100):
+    for i_episode in range(2000):
         rollout.rollout(random_policy, max_timesteps=1000)

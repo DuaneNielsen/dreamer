@@ -5,13 +5,15 @@ import torch.nn.utils.rnn as rnn_utils
 from mentalitystorm import Storeable, BaseVAE
 
 
-class MDNRNN(nn.Module):
-    def __init__(self, z_size, hidden_size, num_layers, n_gaussians):
+class MDNRNN(Storeable, nn.Module):
+    def __init__(self, i_size, z_size, hidden_size, num_layers, n_gaussians):
         nn.Module.__init__(self)
+        Storeable.__init__(self)
+        self.a_size = i_size
         self.z_size = z_size
         self.n_gaussians = n_gaussians
 
-        self.lstm = nn.LSTM(z_size, hidden_size, num_layers, batch_first=True)
+        self.lstm = nn.LSTM(i_size, hidden_size, num_layers, batch_first=True)
 
         self.pi = nn.Linear(hidden_size, z_size * n_gaussians)
         self.lsfm = nn.LogSoftmax(dim=3)
@@ -22,8 +24,9 @@ class MDNRNN(nn.Module):
     z - a list, len(batch_size), of [episode length, latent size]
     pi, mu, sigma - (batch size, episode length, n_gaussians)
     """
-    def forward(self, z):
-        packed = rnn_utils.pack_sequence(z)
+    def forward(self, z, device):
+        packed = rnn_utils.pack_sequence(z).to(device)
+        self.lstm.flatten_parameters()
         packed_output, (hn, cn) = self.lstm(packed)
         output, index = rnn_utils.pad_packed_sequence(packed_output)
 
@@ -63,11 +66,10 @@ class MDNRNN(nn.Module):
     def loss_fn(self, y, pi, mu, sigma):
         y = y.unsqueeze(3)
         mixture = torch.distributions.normal.Normal(mu, sigma)
-        log_prob = mixture.log_prob(y)
+        log_prob = torch.clamp(mixture.log_prob(y), max=0)
         weighted_logprob = log_prob + pi
         log_sum = torch.logsumexp(weighted_logprob, dim=3)
-        log_sum = torch.logsumexp(log_sum, dim=2)
-        return torch.mean(-log_sum)
+        return -log_sum.mean()
 
 
 """
