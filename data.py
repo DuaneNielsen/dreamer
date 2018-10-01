@@ -1,25 +1,8 @@
 import torch
 import torch.utils.data
-from pathlib import Path
+from mentalitystorm import ImageViewer
 
-
-class ActionEncoderDataset(torch.utils.data.Dataset):
-    def __init__(self, directory):
-        torch.utils.data.Dataset.__init__(self)
-        self.path = Path(directory)
-        self.count = 0
-        for _ in self.path.iterdir():
-            self.count += 1
-
-    def __getitem__(self, index):
-        filepath = self.path / str(index)
-        import pickle
-        with open(filepath.absolute(), 'rb') as f:
-            oa = pickle.load(f)
-        return torch.Tensor(oa.observation), torch.Tensor(oa.action)
-
-    def __len__(self):
-        return self.count
+image_viewer = ImageViewer('action', (320, 480))
 
 
 class DeltaStream:
@@ -36,10 +19,10 @@ def collate_action_observation(batch):
     # short longest to shortest
     batch.sort(key=lambda x: x[0].shape[0], reverse=True)
     minibatch = [list(t) for t in zip(*batch)]
-    # first frame has ridiculous high variance, so drop it
-    clean = drop_first_frame(minibatch)
-    delta = observation_deltas(clean)
-    return delta
+    # first frame has ridiculous high variance, so drop it, I
+    #clean = drop_first_frame(minibatch)
+    #delta = observation_deltas(clean)
+    return minibatch
 
 
 def drop_first_frame(minibatch):

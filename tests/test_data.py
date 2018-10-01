@@ -1,4 +1,6 @@
 from unittest import TestCase
+
+import mentalitystorm.atari
 from mentalitystorm import config
 import data
 import torch
@@ -8,7 +10,7 @@ import torch.utils.data as data_utils
 
 class TestData(TestCase):
     def test_data(self):
-        dataset = data.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
+        dataset = mentalitystorm.atari.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
         devset = data_utils.Subset(dataset, range(1))
         dev = data_utils.DataLoader(devset, batch_size=1, collate_fn=data.collate_action_observation)
 

@@ -1,10 +1,11 @@
 import torch
 import data
+import mentalitystorm.atari
 from mentalitystorm import config, Observable, Storeable, OpenCV, dispatcher, ImageChannel
 
 if __name__ == '__main__':
 
-    dataset = data.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
+    dataset = mentalitystorm.atari.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
 
     loader = torch.utils.data.DataLoader(dataset, batch_size=10, collate_fn=data.collate_action_observation)
 
