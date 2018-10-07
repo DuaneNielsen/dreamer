@@ -12,7 +12,7 @@ class TestData(TestCase):
     def test_data(self):
         dataset = mentalitystorm.atari.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
         devset = data_utils.Subset(dataset, range(1))
-        dev = data_utils.DataLoader(devset, batch_size=1, collate_fn=data.collate_action_observation)
+        dev = data_utils.DataLoader(devset, batch_size=1, collate_fn=mentalitystorm.atari.collate_action_observation)
 
         for raw_latent, first_frame, delta_latent, action_minibatch in dev:
             assert raw_latent[0][0, 0, 0] - first_frame[0][0, 0, 0] == delta_latent[0][0, 0, 0]

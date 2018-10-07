@@ -45,11 +45,11 @@ if __name__ == '__main__':
     dev = data_utils.Subset(dataset, range(dataset.count * 2 // 10))
     train = data_utils.Subset(dataset, range(0, dataset.count * 9//10))
     test = data_utils.Subset(dataset, range(dataset.count * 9 // 10 + 1, dataset.count))
-    dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=data.collate_action_observation,
+    dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation,
+                                drop_last=True, )
+    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation, drop_last=True, )
+    test = data_utils.DataLoader(test, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation,
                                  drop_last=True, )
-    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=data.collate_action_observation, drop_last=True,)
-    test = data_utils.DataLoader(test, batch_size=batch_size, collate_fn=data.collate_action_observation,
-                                  drop_last=True, )
 
     convolutions = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
     convolutions.decoder.register_forward_hook(Observable.send_output_as_image)

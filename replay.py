@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     dataset = mentalitystorm.atari.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=10, collate_fn=data.collate_action_observation)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=10, collate_fn=mentalitystorm.atari.collate_action_observation)
 
     d1 = Storeable.load('C:\data\models\GM53H301W5YS38XH')
     d2 = Storeable.load('C:\data\models\GM53H301W5YS38XH')

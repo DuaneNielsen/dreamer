@@ -1,106 +1,19 @@
 import gym
-from abc import abstractmethod, ABC
-from mentalitystorm import config, Dispatcher, Observable, ImageViewer, Storeable, ActionEncoder, ImageVideoWriter, Hookable, RLStep
+from mentalitystorm import config, ImageViewer, Storeable, ActionEncoder
 import torch
-from torchvision.transforms import ToTensor
-import torch.nn as nn
-from collections import namedtuple
-from pathlib import Path
+
+from mentalitystorm.policies import VCPolicy, Rollout
 
 
-class Policy(ABC):
-    @abstractmethod
-    def action(self, screen, observation): raise NotImplementedError
-
-
-class RandomPolicy(Policy):
-    def __init__(self, env):
-        self.env = env
-
-    def action(self, screen, observation):
-        return self.env.action_space.sample()
-
-
-class VCPolicy(Policy):
-    def __init__(self, v, c):
-        self.v = v
-        self.c = c
-        self.trans = ToTensor()
-
-    def action(self, screen, observation):
-        obs = torch.tensor(screen).cuda().float()
-        obs = obs.permute(2, 0, 1).unsqueeze(0)
-        latent, sigma = self.v.encoder(obs)
-        latent = latent.cpu().double().squeeze(3).squeeze(2)
-        action = self.c(latent)
-        _, the_action = action.max(1)
-        return the_action.item()
-
-
-class Rollout(Dispatcher, Observable, Hookable):
-    def __init__(self, env):
-        Hookable.__init__(self)
-        self.env = env
-
-    def register_end_session(self, hook):
-        self.register_after_hook(hook)
-
-    def end_session(self, session):
-        self.execute_after(session)
-
-    def register_step(self, hook):
-        self.register_before_hook(hook)
-
-    def execute_step_hook(self, step):
-        self.execute_before(step)
-
-    def rollout(self, policy, episode, max_timesteps=100):
-        observation = self.env.reset()
-        screen = self.env.render(mode='rgb_array')
-        reward = 0
-        done = False
-        action = policy.action(screen, observation)
-        meta = {'episode': episode}
-        self.execute_step_hook(RLStep(screen, observation, action, reward, done, meta))
-
-        for t in range(max_timesteps):
-
-            observation, reward, done, info = self.env.step(action)
-            screen = self.env.render(mode='rgb_array')
-            action = policy.action(screen, observation)
-
-            self.execute_step_hook(RLStep(screen, None, action, reward, done, meta))
-
-            if done:
-                print("Episode finished after {} timesteps".format(t+1))
-                break
-        self.end_session(episode)
-
-
-if __name__ == '__main__':
-
-    device = torch.device("cuda")
-    visuals = Storeable.load('.\modelzoo\GM53H301W5YS38XH').to(device)
-    controller = torch.load(r'.\modelzoo\best_model')
-    env = gym.make('SpaceInvaders-v4')
-
-    vc_policy = VCPolicy(visuals, controller)
-    #random_policy = RandomPolicy(env)
-    #cvae = models.ConvVAE.load('conv_run2_cart')
-
-    name = 'onvn'
-    #atari_conv = models.AtariConv_v4()
-    #atari_conv = Storeable.load('GM53H301W5YS38XH')
-    #atari_conv = atari_conv.eval()
-    action_encoder = ActionEncoder(env, 'SpaceInvaders-v4')
-
+def main(gym_environment, policy, output_dir):
+    global action_encoder, input_viewer
+    env = gym.make(gym_environment)
+    action_encoder = ActionEncoder(env, gym_environment)
     rollout = Rollout(env)
-    input_viewer = ImageViewer('input', (320, 480))
-
+    input_viewer = ImageViewer('input', (320, 480), 'numpyRGB')
 
     def frame(step):
-        input_viewer.update(step.screen, 'numpyRGB')
-
+        input_viewer.update(step.screen)
 
     rollout.register_before_hook(frame)
 
@@ -109,17 +22,26 @@ if __name__ == '__main__':
 
     def action_encoder_frame(step):
         episode = step.meta['episode']
-        file_path =config.basepath() / 'SpaceInvaders-v4' / 'rl_raw' / str(episode)
+        file_path = config.basepath() / gym_environment / output_dir / str(episode)
         step.meta['filename'] = str(file_path)
         action_encoder.update(step)
 
     rollout.register_step(action_encoder_frame)
     rollout.register_end_session(save)
 
-    #rollout.registerObserver('input', ImageVideoWriter('data/video/spaceinvaders/','random'))
-    #rollout.registerObserver('input', ImageFileWriter('data/images/spaceinvaders/fullscreen', 'input', 16384))
+    for i_episode in range(1000):
+        rollout.rollout(policy, max_timesteps=3000, episode=i_episode)
 
-    for i_episode in range(2000):
 
-        rollout.rollout(vc_policy, max_timesteps=1000, episode=i_episode)
+if __name__ == '__main__':
+
+    gym_environment = 'SpaceInvaders-v4'
+
+    visuals = Storeable.load('.\modelzoo\GM53H301W5YS38XH').to(config.device())
+    controller = torch.load(r'.\modelzoo\best_model68')
+    policy = VCPolicy(visuals, controller)
+
+    output_dir = 'rl_raw_v2'
+
+    main(gym_environment, policy, output_dir)
 
