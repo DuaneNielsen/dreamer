@@ -1,12 +1,14 @@
 import torch
 import torch.nn.utils.rnn as rnn_utils
 import torch.utils.data as data_utils
-import numpy as np
-import matplotlib.pyplot as plt
 
 import mentalitystorm.atari
 from models import MDNRNN
-from mentalitystorm import Storeable, config, Demo, MseKldLoss, OpenCV, Observable, dispatcher, ImageChannel
+from mentalitystorm.storage import Storeable
+from mentalitystorm.config import config
+from mentalitystorm.observe import OpenCV, dispatcher, ImageViewer
+from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
+
 import data
 from tensorboardX import SummaryWriter
 import torchvision
@@ -34,32 +36,31 @@ if __name__ == '__main__':
 
     batch_size = 140
     z_size = 16
-    train_model = False
+    train_model = True
     config.increment('run_id')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    dispatcher.registerView('output', OpenCV('output', (320, 480)))
-    dispatcher.registerView('ground_truth', OpenCV('ground_truth', (320, 480)))
 
-    dataset = mentalitystorm.atari.ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
+    dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
     dev = data_utils.Subset(dataset, range(dataset.count * 2 // 10))
     train = data_utils.Subset(dataset, range(0, dataset.count * 9//10))
     test = data_utils.Subset(dataset, range(dataset.count * 9 // 10 + 1, dataset.count))
-    dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation,
+    dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=collate_action_observation,
                                 drop_last=True, )
-    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation, drop_last=True, )
-    test = data_utils.DataLoader(test, batch_size=batch_size, collate_fn=mentalitystorm.atari.collate_action_observation,
+    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=collate_action_observation, drop_last=True, )
+    test = data_utils.DataLoader(test, batch_size=batch_size, collate_fn=collate_action_observation,
                                  drop_last=True, )
 
     convolutions = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
-    convolutions.decoder.register_forward_hook(Observable.send_output_as_image)
+    convolutions.decoder.register_forward_hook()
 
     ground_truth_decoder = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
-    ground_truth_decoder.decoder.register_forward_hook(ImageChannel('ground_truth').send_output_as_image)
+    ground_truth_decoder.decoder.register_forward_hook(ImageViewer('ground_truth').update)
 
-    #model = MDNRNN(i_size=6, z_size=z_size, hidden_size=256, num_layers=1, n_gaussians=5).to(device)
+    model = MDNRNN(i_size=6, z_size=z_size, hidden_size=256, num_layers=1, n_gaussians=5).to(device)
+
     # model trained directly on latent space
-    model = Storeable.load(r'C:\data\runs\421\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_4.md').to(device)
+    #model = Storeable.load(r'C:\data\runs\421\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_4.md').to(device)
 
     tb = SummaryWriter(config.tb_run_dir(model))
     global_step = 0

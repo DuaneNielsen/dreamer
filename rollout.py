@@ -1,5 +1,9 @@
 import gym
-from mentalitystorm import config, ImageViewer, Storeable, ActionEncoder
+from mentalitystorm.config import config
+from mentalitystorm.observe import ImageViewer
+from mentalitystorm.storage import Storeable
+from mentalitystorm.atari import ActionEncoder
+from mentalitystorm.data_containers import ActionEmbedding
 import torch
 
 from mentalitystorm.policies import VCPolicy, Rollout
@@ -8,7 +12,7 @@ from mentalitystorm.policies import VCPolicy, Rollout
 def main(gym_environment, policy, output_dir):
     global action_encoder, input_viewer
     env = gym.make(gym_environment)
-    action_encoder = ActionEncoder(env, gym_environment)
+    action_encoder = ActionEncoder(env, gym_environment, ActionEmbedding(env))
     rollout = Rollout(env)
     input_viewer = ImageViewer('input', (320, 480), 'numpyRGB')
 

@@ -1,8 +1,5 @@
 import torch
 import torch.utils.data
-from mentalitystorm import ImageViewer
-
-image_viewer = ImageViewer('action', (320, 480))
 
 
 class DeltaStream:

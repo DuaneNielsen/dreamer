@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
-from mentalitystorm import Storeable, BaseVAE
+from mentalitystorm.storage import Storeable
+from mentalitystorm.basemodels import BaseVAE
 
 
 class MDNRNN(Storeable, nn.Module):
