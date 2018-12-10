@@ -12,6 +12,7 @@ class MDNRNN(Storeable, nn.Module):
         Storeable.__init__(self)
         self.a_size = i_size
         self.z_size = z_size
+        self.hidden_size = hidden_size
         self.n_gaussians = n_gaussians
 
         self.lstm = nn.LSTM(i_size, hidden_size, num_layers, batch_first=True)
@@ -31,19 +32,31 @@ class MDNRNN(Storeable, nn.Module):
         packed_output, (hn, cn) = self.lstm(packed)
         output, index = rnn_utils.pad_packed_sequence(packed_output)
 
-        episode_length = output.size(0)
+        mu, pi, sigma = self.paramaterize_mixture(output)
 
+        return pi, mu, sigma, (hn, cn)
+
+    def paramaterize_mixture(self, output):
+        """
+        Uses the output of the lstm to parameterize a mixture model
+        :param output: the output of the lstm
+        :return: mu, pi and sigma, the mean, probability distribution and sigma
+        parameters of the mixture model
+        """
+        episode_length = output.size(0)
         pi = self.pi(output)
         mu = self.mu(output)
         sigma = torch.exp(self.sigma(output))
-
         pi = pi.view(-1, episode_length, self.z_size, self.n_gaussians)
         mu = mu.view(-1, episode_length, self.z_size, self.n_gaussians)
         sigma = sigma.view(-1, episode_length, self.z_size, self.n_gaussians)
-
         pi = self.lsfm(pi)
+        return mu, pi, sigma
 
-        return pi, mu, sigma, (hn, cn)
+    def step(self, z, context):
+        output, context = self.lstm(z, context)
+        mu, pi, sigma = self.paramaterize_mixture(output)
+        return pi, mu, sigma, context
 
     def sample(self, pi, mu, sigma):
         prob_pi = torch.exp(pi)

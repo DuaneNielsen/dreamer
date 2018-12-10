@@ -6,11 +6,12 @@ import mentalitystorm.atari
 from models import MDNRNN
 from mentalitystorm.storage import Storeable
 from mentalitystorm.config import config
-from mentalitystorm.observe import OpenCV, dispatcher, ImageViewer
+from mentalitystorm.observe import UniImageViewer
 from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
 
 import data
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 import torchvision
 import torchvision.transforms as TVT
 
@@ -34,76 +35,71 @@ def timeline(batch_size, timesteps, z_size, device):
 
 if __name__ == '__main__':
 
-    batch_size = 140
+    batch_size = 80
     z_size = 16
     train_model = True
     config.increment('run_id')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/latent'))
+    dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/rl_raw_v2'))
+
     dev = data_utils.Subset(dataset, range(dataset.count * 2 // 10))
     train = data_utils.Subset(dataset, range(0, dataset.count * 9//10))
     test = data_utils.Subset(dataset, range(dataset.count * 9 // 10 + 1, dataset.count))
+
     dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=collate_action_observation,
-                                drop_last=True, )
-    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=collate_action_observation, drop_last=True, )
+                                drop_last=False, )
+    train = data_utils.DataLoader(train, batch_size=batch_size, collate_fn=collate_action_observation, drop_last=False, )
     test = data_utils.DataLoader(test, batch_size=batch_size, collate_fn=collate_action_observation,
-                                 drop_last=True, )
+                                 drop_last=False, )
 
     convolutions = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
-    convolutions.decoder.register_forward_hook()
+    convolutions.decoder.register_forward_hook(UniImageViewer('decoded').view_output)
 
     ground_truth_decoder = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
-    ground_truth_decoder.decoder.register_forward_hook(ImageViewer('ground_truth').update)
+    ground_truth_decoder.decoder.register_forward_hook(UniImageViewer('ground_truth').view_input)
 
-    model = MDNRNN(i_size=6, z_size=z_size, hidden_size=256, num_layers=1, n_gaussians=5).to(device)
+    #model = MDNRNN(i_size=6, z_size=z_size, hidden_size=256, num_layers=1, n_gaussians=5).to(device)
 
-    # model trained directly on latent space
-    #model = Storeable.load(r'C:\data\runs\421\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_4.md').to(device)
+    model = Storeable.load(r'C:\data\runs\687\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_10.md').to(device)
 
     tb = SummaryWriter(config.tb_run_dir(model))
     global_step = 0
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    for epoch in range(100):
-        loss = None
-        for raw_latent, first_frame, delta_latent, action_minibatch in train:
+    for epoch in range(1, 101):
+        train = tqdm(train, desc=f'train {epoch}')
+        for screen, observation, action, reward, done, latent in train:
 
             #seq_length = max_seq_length(observation_minibatch)
             #tl = timeline(batch_size, seq_length, z_size, device)
-            if train_model:
-                pi, mu, sigma, _ = model(action_minibatch, device)
-                padded_obs = rnn_utils.pad_sequence(delta_latent, batch_first=True).squeeze().to(device)
-                padded_obs = padded_obs.clamp(1e-1, 1e1)
-                loss = model.loss_fn(padded_obs, pi, mu, sigma)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                tb.add_scalar('train/loss', loss.item(), global_step)
-                tb.add_scalar('train/sigma', sigma.mean().item(), global_step)
-                global_step += 1
 
-        if epoch % 1 == 0:
-            for raw_latent, first_frame, delta_latent, action_minibatch in test:
-                #tl = timeline(1, 20, z_size, device)
-                pi, mu, sigma, _ = model(action_minibatch, device)
-                padded_obs = rnn_utils.pad_sequence(delta_latent, batch_first=True).squeeze().to(device)
-                loss = model.loss_fn(padded_obs, pi, mu, sigma)
-                print('Loss: ' + str(loss.item()))
-                tb.add_scalar('test/loss', loss.item(), global_step)
-                tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
-                y_pred = model.sample(pi, mu, sigma)
-                y_pred = y_pred[0].squeeze()
-                global_step += 1
+            pi, mu, sigma, _ = model(action, device)
+            padded_latent = rnn_utils.pad_sequence(latent, batch_first=True).squeeze().to(device)
+            padded_latent = padded_latent.clamp(1e-1, 1e1)  # clamp to avoid exploding gradients
+            loss = model.loss_fn(padded_latent, pi, mu, sigma)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train.set_description(f'train epoch: {epoch} loss :{loss.item()}')
+            tb.add_scalar('train/loss', loss.item(), global_step)
+            tb.add_scalar('train/sigma', sigma.mean().item(), global_step)
+            global_step += 1
 
-                ds = data.DeltaStream(first_frame[0])
+        test = tqdm(test, desc=f'test {epoch}')
+        for screen, observation, action, reward, done, latent in test:
+            pi, mu, sigma, _ = model(action, device)
+            padded_latent = rnn_utils.pad_sequence(latent, batch_first=True).squeeze().to(device)
+            loss = model.loss_fn(padded_latent, pi, mu, sigma)
+            test.set_description(f'test epoch: {epoch} loss :{loss.item()}')
+            tb.add_scalar('test/loss', loss.item(), global_step)
+            tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
+            y_pred = model.sample(pi, mu, sigma)
+            y_pred = y_pred[0].squeeze()
+            global_step += 1
 
-                for i, delta in enumerate(delta_latent[0]):
-                    from_delta = ds.delta_to_frame(delta_latent[0][i, :, :]).to(device)
-                    original = raw_latent[0][i, :, :].to(device)
-                    convolutions.decoder(from_delta.unsqueeze(0))
-                    ground_truth_decoder.decoder(original.unsqueeze(0))
+        if epoch % 10 == 0:
             model.save(config.model_fn(model))
 

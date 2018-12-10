@@ -12,7 +12,7 @@ from mentalitystorm.policies import VCPolicy, Rollout
 def main(gym_environment, policy, output_dir):
     global action_encoder, input_viewer
     env = gym.make(gym_environment)
-    action_encoder = ActionEncoder(env, gym_environment, ActionEmbedding(env))
+    action_encoder = ActionEncoder(env, gym_environment, ActionEmbedding(env), policy.v).to(config.device())
     rollout = Rollout(env)
     input_viewer = ImageViewer('input', (320, 480), 'numpyRGB')
 
@@ -33,7 +33,7 @@ def main(gym_environment, policy, output_dir):
     rollout.register_step(action_encoder_frame)
     rollout.register_end_session(save)
 
-    for i_episode in range(1000):
+    for i_episode in range(531, 1000):
         rollout.rollout(policy, max_timesteps=3000, episode=i_episode)
 
 

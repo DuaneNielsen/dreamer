@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     uni_viewer = UniImageViewer('d1', (320, 480))
     dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/rl_raw_v2'))
-    loader = data_utils.DataLoader(dataset, batch_size=2, collate_fn=collate_action_observation)
+    loader = data_utils.DataLoader(dataset, batch_size=4, collate_fn=collate_action_observation)
     loader = tqdm(loader, desc='description')
 
     for screen, observation, action, reward, done, latent in loader:
