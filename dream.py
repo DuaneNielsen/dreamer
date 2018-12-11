@@ -6,6 +6,7 @@ import gym
 from mentalitystorm.observe import UniImageViewer
 from time import sleep
 
+
 def main(model, controller, gym_environment, device, decoder=None):
 
     if decoder is not None:
@@ -14,8 +15,8 @@ def main(model, controller, gym_environment, device, decoder=None):
 
     env = gym.make(gym_environment)
     start_action = ActionEmbedding(env=env).start_tensor().to(device)
-    context = (torch.zeros(1, 1, 256).to(device), torch.zeros(1, 1, 256).to(device))
-    pi, mu, sigma, context = model.step(start_action.unsqueeze(0).unsqueeze(0), context)
+    context = (torch.zeros(1, 1, 32).to(device), torch.zeros(1, 1, 32).to(device))
+    pi, mu, sigma, context = model.step(start_action.unsqueeze(0).unsqueeze(0))
     observation = model.sample(pi, mu, sigma)
 
     for frame in range(1000):
@@ -35,7 +36,7 @@ if __name__ == '__main__':
     gym_environment = 'SpaceInvaders-v4'
     device = config.device()
     model = Storeable.load(
-        r'C:\data\runs\687\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_2.md').to(device)
+        r'C:\data\runs\698\mdnrnn-i_size-6-z_size-16-hidden_size-32-num_layers-5-n_gaussians-3_3.md').to(device)
     controller = torch.load(r'.\modelzoo\best_model68').to(device)
 
     visuals = Storeable.load('.\modelzoo\GM53H301W5YS38XH')

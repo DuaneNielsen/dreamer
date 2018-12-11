@@ -2,19 +2,16 @@ import torch
 import torch.nn.utils.rnn as rnn_utils
 import torch.utils.data as data_utils
 
-import mentalitystorm.atari
 from models import MDNRNN
 from mentalitystorm.storage import Storeable
 from mentalitystorm.config import config
 from mentalitystorm.observe import UniImageViewer
 from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
 
-import data
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-import torchvision
-import torchvision.transforms as TVT
 
+from statistics import mean
 
 def max_seq_length(observation_minibatch):
     max_length = 0
@@ -35,7 +32,7 @@ def timeline(batch_size, timesteps, z_size, device):
 
 if __name__ == '__main__':
 
-    batch_size = 80
+    batch_size = 128
     z_size = 16
     train_model = True
     config.increment('run_id')
@@ -60,17 +57,18 @@ if __name__ == '__main__':
     ground_truth_decoder = Storeable.load('C:\data\models\GM53H301W5YS38XH').to(device)
     ground_truth_decoder.decoder.register_forward_hook(UniImageViewer('ground_truth').view_input)
 
-    #model = MDNRNN(i_size=6, z_size=z_size, hidden_size=256, num_layers=1, n_gaussians=5).to(device)
+    model = MDNRNN(i_size=6, z_size=z_size, hidden_size=32, num_layers=5, n_gaussians=3).to(device)
 
-    model = Storeable.load(r'C:\data\runs\687\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_10.md').to(device)
+    #model = Storeable.load(r'C:\data\runs\687\mdnrnn-i_size-6-z_size-16-hidden_size-256-num_layers-1-n_gaussians-5_10.md').to(device)
 
     tb = SummaryWriter(config.tb_run_dir(model))
     global_step = 0
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    for epoch in range(1, 101):
+    for epoch in range(1, 21):
         train = tqdm(train, desc=f'train {epoch}')
+        losses = []
         for screen, observation, action, reward, done, latent in train:
 
             #seq_length = max_seq_length(observation_minibatch)
@@ -78,28 +76,31 @@ if __name__ == '__main__':
 
             pi, mu, sigma, _ = model(action, device)
             padded_latent = rnn_utils.pad_sequence(latent, batch_first=True).squeeze().to(device)
-            padded_latent = padded_latent.clamp(1e-1, 1e1)  # clamp to avoid exploding gradients
+            padded_latent = padded_latent.clamp(1e-10, 1e10)  # clamp to avoid exploding gradients
             loss = model.loss_fn(padded_latent, pi, mu, sigma)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            train.set_description(f'train epoch: {epoch} loss :{loss.item()}')
+            losses.append(loss.item())
+            train.set_description(f'train epoch: {epoch} loss :{mean(losses)}')
             tb.add_scalar('train/loss', loss.item(), global_step)
             tb.add_scalar('train/sigma', sigma.mean().item(), global_step)
             global_step += 1
 
         test = tqdm(test, desc=f'test {epoch}')
+        losses = []
         for screen, observation, action, reward, done, latent in test:
             pi, mu, sigma, _ = model(action, device)
             padded_latent = rnn_utils.pad_sequence(latent, batch_first=True).squeeze().to(device)
             loss = model.loss_fn(padded_latent, pi, mu, sigma)
-            test.set_description(f'test epoch: {epoch} loss :{loss.item()}')
+            losses.append(loss.item())
+            test.set_description(f'test epoch: {epoch} loss :{mean(losses)}')
             tb.add_scalar('test/loss', loss.item(), global_step)
             tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
             y_pred = model.sample(pi, mu, sigma)
             y_pred = y_pred[0].squeeze()
             global_step += 1
 
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
             model.save(config.model_fn(model))
 

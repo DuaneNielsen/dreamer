@@ -15,7 +15,7 @@ class MDNRNN(Storeable, nn.Module):
         self.hidden_size = hidden_size
         self.n_gaussians = n_gaussians
 
-        self.lstm = nn.LSTM(i_size, hidden_size, num_layers, batch_first=True)
+        self.lstm = nn.LSTM(i_size, hidden_size, num_layers, batch_first=True, dropout=0.2)
 
         self.pi = nn.Linear(hidden_size, z_size * n_gaussians)
         self.lsfm = nn.LogSoftmax(dim=3)
@@ -53,8 +53,11 @@ class MDNRNN(Storeable, nn.Module):
         pi = self.lsfm(pi)
         return mu, pi, sigma
 
-    def step(self, z, context):
-        output, context = self.lstm(z, context)
+    def step(self, z, context=None):
+        if context is None:
+            output, context = self.lstm(z)
+        else:
+            output, context = self.lstm(z, context)
         mu, pi, sigma = self.paramaterize_mixture(output)
         return pi, mu, sigma, context
 
