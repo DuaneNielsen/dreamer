@@ -23,7 +23,8 @@ def main(model, controller, gym_environment, device, decoder=None):
     action_latent = torch.cat((start_action, start_latent)).to(device)
     #context = (torch.zeros(1, 1, 32).to(device), torch.zeros(1, 1, 32).to(device))
     pi, mu, sigma, context = model.step(action_latent.unsqueeze(0).unsqueeze(0))
-    latent = model.sample(pi, mu, sigma)
+    latent_delta = model.sample(pi, mu, sigma)
+    latent = start_latent.to(device) + latent_delta
 
     for frame in range(1000):
         if decoder is not None:
@@ -34,8 +35,9 @@ def main(model, controller, gym_environment, device, decoder=None):
         action[0, 0, index] = 1.0
         action_latent = torch.cat((action.float(), latent), dim=2)
         pi, mu, sigma, context = model.step(action_latent, context)
-        latent = model.sample(pi, mu, sigma)
-        sleep(0.2)
+        latent_delta = model.sample(pi, mu, sigma)
+        latent = latent + latent_delta
+        sleep(0.05)
 
 
 if __name__ == '__main__':

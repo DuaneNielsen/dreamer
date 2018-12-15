@@ -30,6 +30,25 @@ def timeline(batch_size, timesteps, z_size, device):
     return batch
 
 
+class LossRecorder:
+    def __init__(self, description, tb=None, tqdm=None):
+        self.epoch = 0
+        self.losses = []
+        self.description = description
+        self.tb = tb
+        self.tqdm = tqdm
+
+    def record(self, epoch, global_step, loss, tqdm=None):
+        if epoch != self.epoch:
+            self.losses = []
+        self.losses.append(loss.item())
+        if tqdm is not None:
+            tqdm.set_description(f'{self.description} epoch: {self.epoch} loss : {mean(self.losses)}')
+        if self.tb is not None:
+            self.tb.add_scalar(f'{self.description}/loss', loss.item(), global_step)
+            self.tb.add_scalar(f'{self.description}/sigma', sigma.mean().item(), global_step)
+
+
 if __name__ == '__main__':
 
     batch_size = 128
@@ -37,6 +56,7 @@ if __name__ == '__main__':
     z_size = 16
     train_model = True
     config.increment('run_id')
+    clamp = False
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -64,55 +84,51 @@ if __name__ == '__main__':
 
     tb = SummaryWriter(config.tb_run_dir(model))
     global_step = 0
+    train_lr = LossRecorder('train', tb)
+    test_lr = LossRecorder('test', tb)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    def temporal_shift_and_diff(action, latent):
-        action_latent = [torch.cat(act_z, dim=1)[:-1] for act_z in zip(action, latent)]
+    def temporal_shift_and_diff(latent):
+        """
+        computes the delta between timesteps
+        :param latent: a list of observations
+        :return: a list of the differences, shortened by 1
+        """
         z_plus_1_delta = []
         for z in latent:
             z_plus_1 = z.clone()[1:]
             z_plus_1_delta.append(z_plus_1 - z[:-1])
-        return action_latent, z_plus_1_delta
+        return z_plus_1_delta
 
 
     for epoch in range(1, 21):
         train = tqdm(train, desc=f'train {epoch}')
-        losses = []
         for screen, observation, action, reward, done, latent in train:
 
-            #seq_length = max_seq_length(observation_minibatch)
-            #tl = timeline(batch_size, seq_length, z_size, device)
-
             action_latent = [torch.cat(act_z, dim=1)[:-1] for act_z in zip(action, latent)]
-            latent_t_plus_1 = [t.clone()[1:] for t in latent]
+            latent_t_plus_1 = temporal_shift_and_diff(latent)
             pi, mu, sigma, _ = model(action_latent, device)
             padded_latent_t_plus_1 = rnn_utils.pad_sequence(latent_t_plus_1, batch_first=True).squeeze().to(device)
-            #padded_latent = padded_latent.clamp(1e-1, 1e1)
+            if clamp:
+                padded_latent = padded_latent_t_plus_1.clamp(1e-1, 1e1)
             loss = model.loss_fn(padded_latent_t_plus_1, pi, mu, sigma)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            losses.append(loss.item())
-            train.set_description(f'train epoch: {epoch} loss : {mean(losses)}')
-            tb.add_scalar('train/loss', loss.item(), global_step)
-            tb.add_scalar('train/sigma', sigma.mean().item(), global_step)
+            train_lr.record(epoch, global_step, loss, train)
             global_step += 1
 
         test = tqdm(test, desc=f'test {epoch}')
-        losses = []
         for screen, observation, action, reward, done, latent in test:
             action_latent = [torch.cat(act_z, dim=1)[:-1] for act_z in zip(action, latent)]
-            latent_t_plus_1 = [t.clone()[1:] for t in latent]
+            latent_t_plus_1 = temporal_shift_and_diff(latent)
             pi, mu, sigma, _ = model(action_latent, device)
             padded_latent_t_plus_1 = rnn_utils.pad_sequence(latent_t_plus_1, batch_first=True).squeeze().to(device)
             loss = model.loss_fn(padded_latent_t_plus_1, pi, mu, sigma)
-            losses.append(loss.item())
-            test.set_description(f'test epoch : {epoch} loss : {mean(losses)}')
-            tb.add_scalar('test/loss', loss.item(), global_step)
-            tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
             y_pred = model.sample(pi, mu, sigma)
             y_pred = y_pred[0].squeeze()
+            test_lr.record(epoch, global_step, loss, test)
             global_step += 1
 
         if epoch % 1 == 0:
