@@ -94,7 +94,7 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             losses.append(loss.item())
-            train.set_description(f'train epoch: {epoch} loss :{mean(losses)}')
+            train.set_description(f'train epoch: {epoch} loss : {mean(losses)}')
             tb.add_scalar('train/loss', loss.item(), global_step)
             tb.add_scalar('train/sigma', sigma.mean().item(), global_step)
             global_step += 1
@@ -108,7 +108,7 @@ if __name__ == '__main__':
             padded_latent_t_plus_1 = rnn_utils.pad_sequence(latent_t_plus_1, batch_first=True).squeeze().to(device)
             loss = model.loss_fn(padded_latent_t_plus_1, pi, mu, sigma)
             losses.append(loss.item())
-            test.set_description(f'test epoch: {epoch} loss :{mean(losses)}')
+            test.set_description(f'test epoch : {epoch} loss : {mean(losses)}')
             tb.add_scalar('test/loss', loss.item(), global_step)
             tb.add_scalar('test/sigma', sigma.mean().item(), global_step)
             y_pred = model.sample(pi, mu, sigma)
