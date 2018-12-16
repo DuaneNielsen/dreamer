@@ -3,6 +3,8 @@ import torch.nn.utils.rnn as rnn_utils
 import torch.utils.data as data_utils
 
 from models import MDNRNN
+from data import RandomSubSequence
+
 from mentalitystorm.storage import Storeable
 from mentalitystorm.config import config
 from mentalitystorm.observe import UniImageViewer
@@ -10,7 +12,6 @@ from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
 
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-
 from statistics import mean
 
 def max_seq_length(observation_minibatch):
@@ -43,7 +44,7 @@ class LossRecorder:
             self.losses = []
         self.losses.append(loss.item())
         if tqdm is not None:
-            tqdm.set_description(f'{self.description} epoch: {self.epoch} loss : {mean(self.losses)}')
+            tqdm.set_description(f'{self.description} epoch: {epoch} loss : {mean(self.losses)}')
         if self.tb is not None:
             self.tb.add_scalar(f'{self.description}/loss', loss.item(), global_step)
             self.tb.add_scalar(f'{self.description}/sigma', sigma.mean().item(), global_step)
@@ -61,10 +62,11 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/rl_raw_v2'), load_observation=False, load_screen=False)
+    dataset = RandomSubSequence(dataset, 50)
 
-    dev = data_utils.Subset(dataset, range(dataset.count * 2 // 10))
-    train = data_utils.Subset(dataset, range(0, dataset.count * 9//10))
-    test = data_utils.Subset(dataset, range(dataset.count * 9 // 10 + 1, dataset.count))
+    dev = data_utils.Subset(dataset, range(len(dataset) * 2 // 10))
+    train = data_utils.Subset(dataset, range(0, len(dataset) * 9//10))
+    test = data_utils.Subset(dataset, range(len(dataset) * 9 // 10 + 1, len(dataset)))
 
     dev = data_utils.DataLoader(dev, batch_size=batch_size, collate_fn=collate_action_observation,
                                 drop_last=False, )
@@ -102,7 +104,7 @@ if __name__ == '__main__':
         return z_plus_1_delta
 
 
-    for epoch in range(1, 21):
+    for epoch in range(1, 101):
         train = tqdm(train, desc=f'train {epoch}')
         for screen, observation, action, reward, done, latent in train:
 

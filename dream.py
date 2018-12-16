@@ -45,7 +45,7 @@ if __name__ == '__main__':
     gym_environment = 'SpaceInvaders-v4'
     device = config.device()
     model = Storeable.load(
-        r'C:\data\runs\721\mdnrnn-i_size-22-z_size-16-hidden_size-32-num_layers-3-n_gaussians-3_18.md').to(device)
+        r'C:\data\runs\731\mdnrnn-i_size-22-z_size-16-hidden_size-32-num_layers-3-n_gaussians-3_100.md').to(device)
     controller = torch.load(r'.\modelzoo\best_model68').to(device)
 
     visuals = Storeable.load('.\modelzoo\GM53H301W5YS38XH')
