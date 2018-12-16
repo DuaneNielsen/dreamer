@@ -62,7 +62,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataset = ActionEncoderDataset(config.datapath('SpaceInvaders-v4/rl_raw_v2'), load_observation=False, load_screen=False)
-    dataset = RandomSubSequence(dataset, 50)
+    dataset = RandomSubSequence(dataset, 100)
 
     dev = data_utils.Subset(dataset, range(len(dataset) * 2 // 10))
     train = data_utils.Subset(dataset, range(0, len(dataset) * 9//10))
