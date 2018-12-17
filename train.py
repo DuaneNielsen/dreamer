@@ -13,6 +13,7 @@ from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from statistics import mean
+from pathlib import Path
 
 def max_seq_length(observation_minibatch):
     max_length = 0
@@ -49,6 +50,8 @@ class LossRecorder:
             self.tb.add_scalar(f'{self.description}/loss', loss.item(), global_step)
             self.tb.add_scalar(f'{self.description}/sigma', sigma.mean().item(), global_step)
 
+    def loss(self):
+        return mean(self.losses)
 
 if __name__ == '__main__':
 
@@ -134,5 +137,7 @@ if __name__ == '__main__':
             global_step += 1
 
         if epoch % 1 == 0:
-            model.save(config.model_fn(model))
+            model_file = Path(f'runs/1/model_epoch_{epoch}_loss_{test_lr.loss():.4f}.wgt')
+            model_file.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), str(model_file))
 

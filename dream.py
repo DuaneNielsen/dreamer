@@ -5,6 +5,7 @@ from mentalitystorm.data_containers import ActionEmbedding
 from mentalitystorm.data import ActionEncoderDataset, combine_action_latent
 import gym
 from mentalitystorm.observe import UniImageViewer
+from models import MDNRNN
 from time import sleep
 
 
@@ -44,8 +45,13 @@ if __name__ == '__main__':
 
     gym_environment = 'SpaceInvaders-v4'
     device = config.device()
-    model = Storeable.load(
-        r'C:\data\runs\732\mdnrnn-i_size-22-z_size-16-hidden_size-32-num_layers-3-n_gaussians-3_96.md').to(device)
+    model_file = r'.\modelzoo\model_epoch_91_loss_0.0840.wgt'
+    i_size = 16 + 6
+    z_size = 16
+    model = MDNRNN(i_size=i_size, z_size=z_size, hidden_size=32, num_layers=3, n_gaussians=3).to(device)
+    weights = torch.load(model_file)
+    model.load_state_dict(weights)
+    model.to(device)
     controller = torch.load(r'.\modelzoo\best_model68').to(device)
 
     visuals = Storeable.load('.\modelzoo\GM53H301W5YS38XH')
