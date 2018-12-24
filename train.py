@@ -2,17 +2,16 @@ import torch
 import torch.nn.utils.rnn as rnn_utils
 import torch.utils.data as data_utils
 
-from models import MDNRNN
+from mentalitystorm.instrumentation import LossRecorder, UniImageViewer
+from models.mdnrnn import MDNRNN
 from data import RandomSubSequence
 
 from mentalitystorm.storage import Storeable
 from mentalitystorm.config import config
-from mentalitystorm.observe import UniImageViewer
 from mentalitystorm.data import ActionEncoderDataset, collate_action_observation
 
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
-from statistics import mean
 from pathlib import Path
 
 def max_seq_length(observation_minibatch):
@@ -31,27 +30,6 @@ def timeline(batch_size, timesteps, z_size, device):
         batch.append(timeline)
     return batch
 
-
-class LossRecorder:
-    def __init__(self, description, tb=None, tqdm=None):
-        self.epoch = 0
-        self.losses = []
-        self.description = description
-        self.tb = tb
-        self.tqdm = tqdm
-
-    def record(self, epoch, global_step, loss, tqdm=None):
-        if epoch != self.epoch:
-            self.losses = []
-        self.losses.append(loss.item())
-        if tqdm is not None:
-            tqdm.set_description(f'{self.description} epoch: {epoch} loss : {mean(self.losses)}')
-        if self.tb is not None:
-            self.tb.add_scalar(f'{self.description}/loss', loss.item(), global_step)
-            self.tb.add_scalar(f'{self.description}/sigma', sigma.mean().item(), global_step)
-
-    def loss(self):
-        return mean(self.losses)
 
 if __name__ == '__main__':
 

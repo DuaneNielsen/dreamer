@@ -109,3 +109,4 @@ venv.bak/
 .idea/workspace.xml
 
 runs/
+run_config.json
